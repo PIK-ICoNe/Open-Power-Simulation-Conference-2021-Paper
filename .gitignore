@@ -1,0 +1,5 @@
+.vscode
+*.png
+Manifest.toml
+*.err
+*.out

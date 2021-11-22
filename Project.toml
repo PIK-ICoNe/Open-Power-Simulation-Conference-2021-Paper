@@ -1,0 +1,27 @@
+name = "Nordic5"
+uuid = "e05fa92b-f5fb-41dd-a05d-2f7202a16be8"
+authors = ["Anna Büttner <buettner@pik-potsdam.de>", "Hans Würfel <git@wuerfel.io>"]
+version = "0.1.0"
+
+[deps]
+BlockSystems = "4663d367-db1f-4bef-81e7-dc1bd7f7b428"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+DiffEqFlux = "aae7a2af-3d4f-5e19-a356-7da93b79d9d0"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+GraphMakie = "1ecd5474-83a3-4783-bb4f-06765db800d2"
+Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
+NetworkDynamics = "22e9dc34-2a0d-11e9-0de0-8588d035468b"
+OrderedCollections = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+ProBeTune = "a45f557c-d53d-4332-b333-3da8e5e856d9"
+
+[compat]
+BlockSystems = "0.3"

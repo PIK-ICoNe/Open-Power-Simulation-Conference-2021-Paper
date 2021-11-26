@@ -2,12 +2,16 @@ using DiffEqFlux
 using ProBeTune
 using Graphs
 using OrderedCollections
+using GalacticOptim
+export flatten_p, unflatten_p, pbt_loss, pbt_tuning
 
 Base.@kwdef struct NDProblem{IS,SPEC,SYS} <: AbstractPBTProblem
     p::PBTProblemParameters
     input_sampler::IS
     nd_spec::SPEC
     nd_sys::SYS
+    p_spec_structure::Vector{Int}
+    p_sys_structure::Vector{Int}
     y0_spec::Vector{Float64}
     y0_sys::Vector{Float64}
     P_inj::Vector{Float64}
@@ -15,96 +19,105 @@ Base.@kwdef struct NDProblem{IS,SPEC,SYS} <: AbstractPBTProblem
 end
 
 """
-    make_p_dict(paras)
-Creates a dict which gives the position of a parameter, originally given in an array of arrays, one for each node, in a flat array.
+    flatten_p(pbt_prob, p_sys_unflat, p_specs_unflat)
+
+Transform two nested parameter objects `p_sys_unflat` and a vector of
+`p_specs_unflat` to a flat stacked vector.
+
+    p_sys, p_spec1, p_spec2, ...
+
+This method should only be necessary to create the initial flat parameters!
 """
-function make_p_dict(paras)
-    p_dict = OrderedDict{Int, Vector{Int}}()
-    counter = 1 # gives the position in the flat array
-    for node in 1:length(paras) 
-        if paras[node] == [] # accounting for nodes which don't have tuneable parameters
-            p_dict[node] = (counter, 0.0) # we will fill empty parameter slots with zeros 
-            counter += 1
-        elseif length(paras[node]) > 1 # nodes with multiple tuneable parameters
-            dict_entry = []
-            for j in 1:length(paras[node])
-                push!(dict_entry, counter)
-                counter += 1
-            end
-            p_dict[node] = dict_entry
-        else # nodes with only one tuneable parameter
-            p_dict[node] = [counter]
-            counter += 1
-        end
+function flatten_p(pbt_prob, p_sys_unflat, p_specs_unflat)
+    @assert length(p_specs_unflat) == pbt_prob.p.N_samples
+
+    # start with flat sys parameters
+    p_flat  = _flatten_p(pbt_prob.p_sys_structure,  p_sys_unflat)
+    @assert pbt_prob.p.size_p_sys == length(p_flat)
+
+    # no append for each spec
+    for p_spec_unflat in p_specs_unflat
+        p_spec_flat = _flatten_p(pbt_prob.p_spec_structure, p_spec_unflat)
+        @assert pbt_prob.p.size_p_spec == length(p_spec_flat)
+        append!(p_flat, p_spec_flat)
     end
-    return p_dict
+    return p_flat
 end
 
+"""
+    unflatten_p(pbt_prob, p_sys_flat, p_spec_flat)
+
+Unflatten given flat arrays of sys and spec parameters according to
+parameter structure.
+Returns tuple of `p_sys_unflat` and `p_spec_unflat`.
+"""
+function unflatten_p(pbt_prob, p_sys_flat, p_spec_flat)
+    p_sys_unflat  = _unflatten_p(pbt_prob.p_sys_structure,  p_sys_flat)
+    p_spec_unflat = _unflatten_p(pbt_prob.p_spec_structure, p_spec_flat)
+    (p_sys_unflat, p_spec_unflat)
+end
+
+"""
+    _flatten_p(structure, p_unflat)
+
+Check whether given structure matches the unflat parameters
+and return vector of flatten Parameters.
+"""
+function _flatten_p(structure, p_unflat::Matrix)
+    @assert all(structure .== size(p_unflat)[2])
+    transpose(p_unflat)[:]
+end
+function _flatten_p(structure, p_unflat::Vector{T}) where T
+    @assert all(length.(p_unflat) .== structure)
+    vcat((p_unflat...)...)
+end
+
+"""
+    _unflatten_p(structure, p_flat)
+
+Transform the flat parameter vector to a `Vector{Vector}` according
+to the `structure`.
+"""
+function _unflatten_p(structure, p_flat)
+    @assert sum(structure) == length(p_flat)
+    p = Vector{Vector{eltype(p_flat)}}(undef, length(structure))
+    pos = 1
+    for (i, size) in enumerate(structure)
+        p[i] = p_flat[pos:pos+(size-1)]
+        pos += size
+    end
+    return p
+end
 
 """
     wrap_node_p(p_base, p_additional)
-Wraps parameters for the simulation. p_base contains the perturbed parameters while p_additional accounts for the tuneable parameters.
+
+For each node take the base parameters and append the additional parameters.
 """
 function wrap_node_p(p_base, p_additional)
+    @assert length(p_base) == length(p_additional)
     N = length(p_base)
-
-    # each vertex gets a tuple of parameters, P_inj first and than the others
-    return [(vcat(p_base[i], p_additional[i]...)) for i in 1:N]
+    # each vertex gets a vector of parameters, P_base first and than the others
+    return [vcat(p_base[i]..., p_additional[i]...) for i in 1:N]
 end
-
-"""
-    get_ordered(dict, unordered)
-Orders the flat array "unordered" and orders it for the ODEFunction using dict.
-"""
-function get_ordered(dict, unordered)
-    ordered = Vector{Vector{Any}}(undef, 0)
-    for key in keys(dict)
-        if typeof(dict[key]) == Tuple{Int64, Float64}
-            push!(ordered, [0.0]) # adding a zero for nodes which don't have a tuneable parameter
-        else
-            push!(ordered, [unordered[val] for val in dict[key]])
-        end
-    end
-    return ordered
-end
-
-"""
-    solve_sys_spec_n(pbt::NDProblem, n::Int, p, p_dict; solver_options...)
-Solve system and spec for the nth input sample given a stacked parameter array p and the parameter dict p_dict.
-Parameters:
-- `pbt`: existing PBTProblem instance
-- `n`: number of input in the array
-- `p`: combined array of sys and spec parameters
-- `p_dict`: Dict giving the positions of the parameters in a flat array and with respect to an ordered array for NetworkDynamics.jl
-"""
-function ProBeTune.solve_sys_spec_n(pbt::NDProblem, n::Int, p, p_dict; solver_options...)
-    i = pbt.input_sampler[n]
-
-    p = get_ordered(p_dict, p) # orders the flat parameter array
-
-    num_node_sys = nv(pbt.nd_sys.f.graph)
-
-    p_sys = p[1:num_node_sys] # each node has its own array in the parameter array
-    p_spec = p[num_node_sys + 1:end]
-
-    solve_sys_spec(pbt, i, p_sys, p_spec; solver_options...)
-end
-
 
 """
     pbt_loss(pbt::NDProblem, p, p_dict; solver_options...)
 pbt_loss provides the loss function for the Probabilistic Tuning Problem.
+Uses multi threading to speed up the calculations.
 """
-function ProBeTune.pbt_loss(pbt::NDProblem, p, p_dict; solver_options...)
-    loss = 0.0
-    for n in 1:pbt.p.N_samples
-        sol_sys, sol_spec = solve_sys_spec_n(pbt, n, p, p_dict; solver_options...)
-        loss += pbt.p.output_metric(sol_sys, sol_spec)
+function ProBeTune.pbt_loss(pbt::NDProblem, p; solver_options...)
+    losses = zeros(eltype(p), pbt.p.N_samples)
+
+    Threads.@threads for n in 1:pbt.p.N_samples
+        _pbt = deepcopy(pbt)
+        sol_sys, sol_spec = solve_sys_spec_n(_pbt, n, copy(p); solver_options...)
+        losses[n] = _pbt.p.output_metric(sol_sys, sol_spec)
     end
 
+    loss = sum(losses)
     loss / pbt.p.N_samples
 end
-
 
 """
     pbt_tuning(pbt::NDProblem, p, p_dict; optimizer = DiffEqFlux.ADAM(0.01), optimizer_options = (:maxiters => 100,), solver_options...)
@@ -112,16 +125,15 @@ Tune the system to the specification.
 # Arguments:
 - `pbt`: PBT problem
 - `p`: stacked array of initial system and specification parameters
-- `p_dict`: Dict giving the positions of the parameters in a flat array and with respect to an ordered array for NetworkDynamics.jl
 - `optimizer`: choose optimization algorithm (default `DiffEqFlux.ADAM(0.01)`)
 - `optimizer_options`: choose optimization options (default `(:maxiters => 100,)`)
 - `solver_options...` all further options are passed through to the differential equations solver
 """
-function ProBeTune.pbt_tuning(pbt::NDProblem, p, p_dict; optimizer = DiffEqFlux.ADAM(0.01), optimizer_options = (:maxiters => 100,), solver_options...)
+function ProBeTune.pbt_tuning(pbt::NDProblem, p; optimizer=DiffEqFlux.ADAM(0.01), optimizer_options=(:maxiters => 100,), solver_options...)
     DiffEqFlux.sciml_train(
-      x -> pbt_loss(pbt, x, p_dict; solver_options...),
+      x -> pbt_loss(pbt, x; solver_options...),
       p,
-      optimizer;
+      optimizer, GalacticOptim.AutoForwardDiff();
       optimizer_options...
       )
 end

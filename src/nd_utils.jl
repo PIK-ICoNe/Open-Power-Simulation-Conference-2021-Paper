@@ -83,43 +83,4 @@ function total_current(edges)
     current
 end
 
-function voltage_angle_series(sol, idx)
-    syms = sol.prob.f.syms
-    δ_idx = findfirst(s -> contains(String(s), Regex("δ_$idx\$")), syms)
-    if δ_idx !== nothing
-        println("use δ of ODEVertex, might be wrong for complex models!")
-        return t -> sol(t)[δ_idx]
-    else
-        u_r_idx = findfirst(s -> contains(String(s), Regex("_$idx\$")), syms)
-        u_i_idx = u_r_idx + 1
-        return t -> atan(sol(t)[u_i_idx], sol(t)[u_r_idx])
-    end
-end
-
-
-function voltage_mag_series(sol, idx)
-    syms = sol.prob.f.syms
-    u_r_idx = findfirst(s -> contains(String(s), Regex("_$idx\$")), syms)
-    u_i_idx = u_r_idx + 1
-
-    t -> sqrt(sol(t)[u_i_idx]^2 + sol(t)[u_r_idx]^2)
-end
-
-has_frequency_series(sol, idx) = !isnothing(findfirst(s -> contains(String(s), Regex("ω_$idx\$")), sol.prob.f.syms))
-
-function frequency_series(sol, idx)
-    syms = sol.prob.f.syms
-    ω_idx = findfirst(s -> contains(String(s), Regex("ω_$idx\$")), syms)
-    t -> sol(t)[ω_idx]
-end
-
 get_u0(nd, dict) = getindex.(Ref(dict), nd.syms)
-
-function power_series(sol, idx, t)
-    syms = sol.prob.f.syms
-    nd = sol.prob.f
-    u_r_idx = findfirst(s -> contains(String(s), Regex("_$idx\$")), syms)
-    u_i_idx = u_r_idx + 1
-
-    t -> -(sol(t)[u_r_idx] + 1im * sol(t)[u_i_idx]) * conj(get_current(nd, sol(t), idx))
-end

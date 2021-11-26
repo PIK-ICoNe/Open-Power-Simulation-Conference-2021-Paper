@@ -31,14 +31,14 @@ module Nordic5
     include("input_samplers.jl")
     include("loss_functions.jl")
 
-    export NDProblem, make_p_dict, solve_sys_spec_n, pbt_loss, pbt_tuning
+    export NDProblem
     export frequency_metric, single_node_perturbation
     export get_easy_inverter
     export get_hydro_wind_simple, get_thermal_wind_simple
     export get_controlled_swing
     export get_hydro, get_thermal
     export get_hydro_1_p, get_hydro_1_p, get_hydro_2_p, get_hydro_3_p, get_thermal_5_p, get_thermal_4_p, get_wt_simple_p
-    export voltage_mag_series, voltage_angle_series, get_u0, frequency_series, has_frequency_series
+    export get_u0
     export StaticLine
     export get_current, total_current, power_series
 end # module

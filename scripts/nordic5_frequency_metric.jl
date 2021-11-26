@@ -34,13 +34,15 @@ function generate_nordic5(P_ref_vec)
     g = get_g()
     edge = StaticLine(-100im)
 
-    # node 1, only hydro
+    # node 1
+    println("Create Node 1")
     hydro1_c = get_constant_Pref(:P_fix => P_ref_vec[1])
     hydro1 = get_hydro(hydro1_c, get_hydro_1_p())
     hydro1 = set_p(hydro1, :Q_inj => 0.0)
     node1 = ODEVertex(hydro1, [:P_inj, :D])
 
-    # node 2, hydro and wind
+    # node 2
+    println("Create Node 2")
     hydro2_c = get_constant_Pref(:P_fix => P_ref_vec[2])
     wind2_c  = get_constant_Pref(:P_fix => P_ref_vec[3])
     wind_hydro_2_para = Dict(vcat(get_hydro_2_p(), get_wt_simple_p(),
@@ -50,13 +52,15 @@ function generate_nordic5(P_ref_vec)
     hydro_wind = set_p(hydro_wind, wind_hydro_2_para)
     node2 = ODEVertex(hydro_wind, [:P_inj, :D])
 
-    # node 3, only hydro
+    # node 3
+    println("Create Node 3")
     hydro3_c = get_constant_Pref(:P_fix => P_ref_vec[4])
     hydro3 = get_hydro(hydro3_c, get_hydro_3_p())
     hydro3 = set_p(hydro3, :Q_inj => 0.0)
     node3 = ODEVertex(hydro3, [:P_inj, :D])
 
-    # node 4, wind and thermal
+    # node 4
+    println("Create Node 4")
     wind4_c  = get_constant_Pref(:P_fix => P_ref_vec[5])
     wind_thermal_4_para = Dict(vcat(get_thermal_4_p(), get_wt_simple_p(),
                                     :Q_inj => -0.0,
@@ -67,7 +71,8 @@ function generate_nordic5(P_ref_vec)
     thermal_wind = set_p(thermal_wind, wind_thermal_4_para)
     node4 = ODEVertex(thermal_wind, [:P_inj, :D])
 
-    # node 5, only thermal
+    # node 5
+    println("Create Node 5")
     thermal5 = get_thermal()
     thermal5_para = Dict(vcat(get_thermal_5_p(),
                             :Q_inj => -0.0,
@@ -76,7 +81,8 @@ function generate_nordic5(P_ref_vec)
     thermal5 = set_p(thermal5, thermal5_para)
     node5 = ODEVertex(thermal5, [:P_inj, :D]);
 
-    return network_dynamics([node1, node2, node3, node4, node5], edge, g)
+    println("Create Nordic5 Network")
+    network_dynamics([node1, node2, node3, node4, node5], edge, g)
 end
 
 """
@@ -85,6 +91,7 @@ ODEFunction consisting of 5 swing equations with additional proportional control
 All parameters, except the proportional gains D_i, are fixed.
 """
 function generate_spec(P_ref_vec)
+    println("Create Specification")
     g = get_g()
 
     @parameters t ω(t) D P_ref_0
@@ -106,28 +113,34 @@ end
     solve_sys_spec(pbt::NDProblem, in, p_sys, p_spec)
 Solve the system and specification for given parameters
 Parameters:
-- `pbt::PBTProblem`
+- `pbt::NDProblem`
 - `i`: input to the system
-- `p_sys`: parameters of the system
-- `p_spec`: parameters of specification
+- `p_sys_flat`: parameters of the system
+- `p_spec_flat`: parameters of specification
 """
-function ProBeTune.solve_sys_spec(pbt::NDProblem, in, p_sys, p_spec)
+function ProBeTune.solve_sys_spec(pbt::NDProblem, in, p_sys_flat, p_spec_flat)
+    p_sys, p_spec = unflatten_p(pbt, p_sys_flat, p_spec_flat)
+
     # injected power is base injected power + input
     P_inj = pbt.P_inj .+ in
-       
-    # wrap the parameters
+
+    # system
     p_sys = wrap_node_p(P_inj, p_sys)
-    
-    y0_sys = convert(eltype(p_sys), pbt.y0_sys)
+    y0_sys = convert(Vector{eltype(p_sys_flat)}, pbt.y0_sys)
+    @assert isconcretetype(typeof(p_sys))
+    @assert isconcretetype(typeof(y0_sys))
 
     prob_sys = ODEProblem(pbt.nd_sys, y0_sys, pbt.tspan, (p_sys, nothing))
     sol_sys = solve(prob_sys, Rodas4())
 
+    # specification
     p_spec = wrap_node_p(P_inj, p_spec)
-    y0_spec = convert(eltype(p_spec), pbt.y0_spec)
-    
+    y0_spec = convert(Vector{eltype(p_spec_flat)}, pbt.y0_spec)
+    @assert isconcretetype(typeof(p_spec))
+    @assert isconcretetype(typeof(y0_spec))
+
     prob_spec = ODEProblem(pbt.nd_spec, y0_spec, pbt.tspan, (p_spec, nothing))
-    sol_spec = solve(prob_spec, Rodas4())
+    sol_spec = solve(prob_spec, Tsit5())
 
     return sol_sys, sol_spec
 end
@@ -137,7 +150,7 @@ end
 Writes the the loss into a .txt-file after each iteration of the optimizer.
 """
 function save_loss_callback(p, loss)
-    output = joinpath(@__DIR__, "../data/loss.txt")
+    output = joinpath(@__DIR__, "../data/loss_new.txt")
     if isfile(output)
         open(output, "a") do io
             writedlm(io, [loss])

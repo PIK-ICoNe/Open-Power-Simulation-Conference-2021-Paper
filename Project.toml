@@ -25,4 +25,5 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 ProBeTune = "a45f557c-d53d-4332-b333-3da8e5e856d9"
 
 [compat]
-BlockSystems = "0.3"
+BlockSystems = "0.3.1"
+NetworkDynamics = "0.7"

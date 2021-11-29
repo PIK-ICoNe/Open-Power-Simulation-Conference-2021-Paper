@@ -31,7 +31,7 @@ dist_init, p_init, distances_init  = behavioural_distance(pbt_prob, p_flat; verb
 
 ptune = pbt_tuning(pbt_prob, p_init; optimizer_options=(:maxiters=>250, :cb=> save_loss_callback))
 #writedlm(joinpath(@__DIR__, "../data/input_samples.txt"), pbt_prob.input_sampler._cache)
-#writedlm(joinpath(@__DIR__, "../data/ptune.txt"), ptune)
+#writedlm(joinpath(@__DIR__, "../data/p_tune.txt"), ptune)
 
 dist_end, p_end, distances_end = behavioural_distance(pbt_prob, ptune; verbose=true, optimizer_options=(:maxiters => 1000,))
 

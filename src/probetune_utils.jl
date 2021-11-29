@@ -103,6 +103,7 @@ end
 
 """
     pbt_loss(pbt::NDProblem, p, p_dict; solver_options...)
+
 pbt_loss provides the loss function for the Probabilistic Tuning Problem.
 Uses multi threading to speed up the calculations.
 """
@@ -121,6 +122,7 @@ end
 
 """
     pbt_tuning(pbt::NDProblem, p, p_dict; optimizer = DiffEqFlux.ADAM(0.01), optimizer_options = (:maxiters => 100,), solver_options...)
+
 Tune the system to the specification.
 # Arguments:
 - `pbt`: PBT problem

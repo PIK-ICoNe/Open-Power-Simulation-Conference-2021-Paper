@@ -87,6 +87,7 @@ end
 
 """
     get_exciter()
+    
 Exciter connected to the thermal machines.
 """
 function get_exciter()

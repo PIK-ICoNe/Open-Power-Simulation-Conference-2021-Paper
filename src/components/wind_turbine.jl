@@ -1,5 +1,3 @@
-softplus(x; f=10) = 1/f*log(one(x) + exp(f*x))
-softmax(x, y) = x+softplus(y-x)
 # This part needs some clarification
 function get_simple_wind_gov()
     @parameters t P_ref(t) z P_mpp

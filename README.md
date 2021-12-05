@@ -10,7 +10,7 @@ An Open Source Software Stack for Tuning the Dynamical Behavior of Complex Power
 This repository contains the source-code, scripts and data used in the paper.
 
 One of the Julia package used in this scripts ([`ProBeTune.jl`](https://github.com/PIK-ICoNe/ProBeTune.jl)) is not fully published yet.
-In order to run the code you have to manually add the `interface` revision of this package from GitHub!
+In order to run the code you have to manually add it from GitHub!
 ```
-julia> ] add https://github.com/PIK-ICoNe/ProBeTune.jl#interface
+julia> ] add https://github.com/PIK-ICoNe/ProBeTune.jl
 ```
